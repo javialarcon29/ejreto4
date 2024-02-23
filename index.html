@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa con Geolocalización</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+/* Estilos base */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Estilos generales */
+header {
+  background-color: #4CAF50;
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 36px;
+  font-weight: bold;
+}
+
+header img {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  margin-top: 20px;
+}
+
+button {
+  padding: 10px 20px;
+  margin: 5px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+.eliminar-icon-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.eliminar-icon-button img {
+  width: 30px;
+  height: 30px;
+}
+
+#map {
+  height: 450px;
+}
+
+footer {
+  background-color: #ff0000;
+  color: #ffffff;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  bottom: 0;
+  width: 100%;
+}
+
+#infoPanel,
+#historicPanel {
+  background-color: #f0f0f0;
+  padding: 10px;
+  margin-top: 20px;
+}
+
+.separator {
+  margin: 20px auto;
+  border: none;
+  height: 2px;
+  background-color: #45a049;
+  width: 100%;
+}
+
+/* Media queries para hacer la página responsive */
+@media screen and (max-width: 768px) {
+  header {
+    padding: 30px;
+  }
+  header h1 {
+    font-size: 24px;
+  }
+  header img {
+    width: 80px;
+    height: 80px;
+    margin-top: 10px;
+  }
+  #map {
+    height: 300px;
+  }
+  footer {
+    padding: 10px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  header {
+    padding: 20px;
+  }
+  header h1 {
+    font-size: 18px;
+  }
+  header img {
+    width: 60px;
+    height: 60px;
+    margin-top: 5px;
+  }
+  footer {
+    padding: 10px;
+  }
+}
+
+
+  </style>
+</head>
+
+<body>
+  <!-- Header -->
+  <header>
+    <img src="https://png.pngtree.com/png-vector/20190215/ourmid/pngtree-vector-car-icon-png-image_533256.jpg" alt="Aparca Fácil Logo">
+    <h1>Aparca Fácil</h1>
+  </header>
+
+  <!-- Map and Controls  -->
+  <div id="map"></div>
+<div id="infoPanel"></div>
+<hr class="separator"> <!-- Separador con diseño -->
+<div id="buttonContainer">
+  <button onclick="mostrar()">Mostrar posición</button>
+  <button onclick="AñadirMarcador()">Añadir Marcador</button>
+  <button onclick="eliminarMarcador()">Eliminar Marcador</button>
+  <button onclick="PosicionActualCoche()">Posición Actual del coche</button>
+  <button onclick="mostrarHistorico()">Mostrar Histórico</button>
+
+  <label for="transporte">Selecciona modo de Transporte hasta la distancia clicada:</label>
+  <select id="transporte" onchange="actualizarModoTransporte()">
+    <option value="coche">Coche</option>
+    <option value="andando">Andando</option>
+  </select>
+</div>
+<div id="historicPanel"></div> <!-- Movido aquí debajo del contenedor de botones -->
+
+<!-- Leaflet Library -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map').setView([51.505, -0.09], 13);
+    var carLatitude, carLongitude; // Variables para almacenar la posición del coche
+    var markerLayer = L.layerGroup().addTo(map);
+    var currentPositionTime = null; // Variable para almacenar el tiempo de la posición actual
+    var historicLocations = []; // Array para almacenar el historial de ubicaciones
+    var modoTransporte = 'coche'; // Modo de transporte por defecto
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Función para mostrar la posición actual
+    // Función para mostrar la posición actual utilizando watchPosition
+    function mostrar() {
+    document.getElementById("infoPanel").innerHTML = "<p>Locating...</p>";
+
+    var geo_options = { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 };
+
+    if (navigator.geolocation) {
+        // Geolocalización está disponible
+        if (watchProcess == null) {
+            watchProcess = navigator.geolocation.watchPosition(geo_success, geo_error, geo_options);
+        }
+    } else {
+        // Geolocalización NO está disponible
+        geo_is_not_available();
+    }
+}
+
+function stop_watch_position() {
+    if (watchProcess != null) {
+        navigator.geolocation.clearWatch(watchProcess);
+        watchProcess = null;
+    }
+}
+
+function geo_success(position) {
+    var latitude = position.coords.latitude;
+    var longitude = position.coords.longitude;
+    var accuracy = position.coords.accuracy;
+
+    document.getElementById("infoPanel").innerHTML = '<p>Latitude: ' + latitude +
+        '&deg;<br>Longitude: ' + longitude + '&deg;<br>Accuracy: ' + accuracy + ' m</p>';
+
+    var img = new Image();
+    img.src = "http://maps.google.com/maps/api/staticmap?sensor=false&center=" + latitude + "," + longitude + "&zoom=14&size=600x200&markers=color:blue|label:S|" + latitude + ',' + longitude;
+    document.getElementById("infoPanel").appendChild(img);
+}
+
+function geo_error(error) {
+    document.getElementById("infoPanel").innerHTML = '<p>ERROR(' + error.code + '): ' + error.message + '</p>';
+}
+
+function geo_is_not_available() {
+    document.getElementById("infoPanel").innerHTML = "<p>Geolocation is not supported by your browser</p>";
+}
+
+
+
+    // Función para añadir dirección escrita
+    function AñadirMarcador() {
+      var name = prompt("Ingrese un nombre para la ubicación:");
+      if (name) {
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          var latlng = [pos.coords.latitude, pos.coords.longitude];
+          var marker = L.marker(latlng).addTo(markerLayer);
+          marker.bindPopup("<b>" + name + "</b><br>Latitud: " + latlng[0] + "<br>Longitud: " + latlng[1]).openPopup();
+          historicLocations.push({ name: name, latlng: latlng, timestamp: new Date() });
+
+          // Mostrar el historial actualizado
+          mostrarHistorico();
+
+          // Guardar en localStorage
+          localStorage.setItem('historicLocations', JSON.stringify(historicLocations));
+        });
+      }
+    }
+
+    // Función para eliminar marcador
+    function eliminarMarcador() {
+      markerLayer.clearLayers(); // Limpiar marcadores
+      limpiarPanel(); // Limpiar panel de información
+    }
+
+    // Función para limpiar el panel de información
+    function limpiarPanel() {
+      document.getElementById("infoPanel").innerHTML = "";
+    }
+
+    // Función para mostrar el histórico
+    // Función para mostrar el histórico
+function mostrarHistorico() {
+  var historicoHTML = "<h2>Historial de Ubicaciones</h2>";
+  historicLocations.forEach(function (location, index) {
+    var elapsedTime = calcularTiempoTranscurrido(location.timestamp);
+    historicoHTML += "<p><b>" + location.name + "</b> - Latitud: " + location.latlng[0] + ", Longitud: " + location.latlng[1] + " - Tiempo estacionado: " + elapsedTime + "<button class='eliminar-icon-button' onclick='eliminarUbicacion(" + index + ")'><img class='eliminar-icon' src=\"https://cdn-icons-png.flaticon.com/128/1828/1828843.png\" alt=\"Eliminar\"></button></p>";
+  });
+  document.getElementById("historicPanel").innerHTML = historicoHTML;
+
+  // Guardar en localStorage
+  localStorage.setItem('historicPanelContent', historicoHTML);
+}
+
+    // Función para eliminar una ubicación del historial
+    function eliminarUbicacion(index) {
+      historicLocations.splice(index, 1); // Eliminar la ubicación del historial
+      mostrarHistorico(); // Actualizar la vista del historial
+      localStorage.setItem('historicLocations', JSON.stringify(historicLocations)); // Actualizar localStorage
+    }
+
+    // Función para calcular el tiempo transcurrido desde una fecha dada hasta el momento actual
+    function calcularTiempoTranscurrido(timestamp) {
+      var currentTime = new Date();
+      var elapsedTime = (currentTime - timestamp) / 1000; // Tiempo en segundos
+      var horas = Math.floor(elapsedTime / 3600); // Extraer las horas completas
+      var minutos = Math.floor((elapsedTime % 3600) / 60); // Extraer los minutos restantes
+      var segundos = Math.floor(elapsedTime % 60); // Extraer los segundos restantes
+      return horas + " horas, " + minutos + " minutos, " + segundos + " segundos";
+    }
+
+    // Función para la posición del coche
+    function PosicionActualCoche() {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        currentPositionTime = new Date(); // Guardar el tiempo actual
+        document.querySelector("#infoPanel").innerHTML = "Latitude: " + pos.coords.latitude +
+          "<br>Longitude: " + pos.coords.longitude;
+
+        map.setView([pos.coords.latitude, pos.coords.longitude], 16);
+
+        var marker = L.marker([pos.coords.latitude, pos.coords.longitude]).addTo(map);
+        marker.bindPopup("<b>Posición Actual del coche</b><br>Su coche está aquí");
+
+        // Establecer la posición del coche
+        setCarPosition(pos.coords.latitude, pos.coords.longitude);
+
+        // Calcular la distancia entre la posición actual y la posición del coche.
+        var carDistance = calcularDistanciaEntreDosCoordenadas(pos.coords.latitude, pos.coords.longitude, carLatitude, carLongitude);
+
+        // Calcular el tiempo transcurrido desde la posición actual
+        var currentTime = new Date();
+        var elapsedTime = (currentTime - currentPositionTime) / 1000;
+
+        // Mostrar la distancia y el tiempo en el elemento p con id "infoPanel"
+        var horas = Math.floor(elapsedTime / 3600); // Extraer las horas completas
+        var minutos = Math.floor((elapsedTime % 3600) / 60); // Extraer los minutos restantes
+        var segundos = Math.floor(elapsedTime % 60); // Extraer los segundos restantes
+        document.getElementById("infoPanel").innerHTML += "<br>Distancia al coche: " + carDistance.toFixed(2) + " km";
+        document.getElementById("infoPanel").innerHTML += "<br>Tiempo transcurrido: " + horas + " horas, " + minutos + " minutos, " + segundos + " segundos";
+
+        // Guardar en localStorage
+        localStorage.setItem('carPosition', JSON.stringify({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude
+        }));
+        localStorage.setItem('carDistance', carDistance.toFixed(2));
+        localStorage.setItem('elapsedTime', elapsedTime);
+      });
+    }
+
+    // Función para establecer la posición del coche
+    function setCarPosition(latitude, longitude) {
+      carLatitude = latitude;
+      carLongitude = longitude;
+    }
+
+    // Función para calcular la distancia entre dos coordenadas
+    function calcularDistanciaEntreDosCoordenadas(lat1, lon1, lat2, lon2) {
+      var R = 6371; // Radio de la tierra en km
+      var dLat = gradosARadianes(lat2 - lat1);
+      var dLon = gradosARadianes(lon2 - lon1);
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(gradosARadianes(lat1)) * Math.cos(gradosARadianes(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      var d = R * c; // Distancia en km
+      return d;
+    }
+
+    function gradosARadianes(grados) {
+      return grados * Math.PI / 180;
+    }
+
+    var popup = L.popup();
+
+    function onMapClick(e) {
+      popup
+        .setLatLng(e.latlng)
+        .setContent("Tu seleccionaste " + e.latlng.toString())
+        .openOn(map);
+      var marker = L.marker(e.latlng).addTo(map);
+      marker.bindPopup("Quiero ir allí");
+
+      // Calcular la distancia entre la posición actual y la posición clicada
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var currentPosition = [pos.coords.latitude, pos.coords.longitude];
+        var clickedPosition = [e.latlng.lat, e.latlng.lng];
+        var clickedDistance = calcularDistanciaEntreDosCoordenadas(currentPosition[0], currentPosition[1], clickedPosition[0], clickedPosition[1]);
+
+        // Calcular el tiempo transcurrido desde la posición actual
+        var currentTime = new Date();
+        var elapsedTime = (currentTime - currentPositionTime) / 1000; // Tiempo en segundos
+
+        var horas = Math.floor(elapsedTime / 3600); // Extraer las horas completas
+        var minutos = Math.floor((elapsedTime % 3600) / 60); // Extraer los minutos restantes
+        var segundos = Math.floor(elapsedTime % 60); // Extraer los segundos restantes
+
+        // Calcular el tiempo estimado para llegar en base a la distancia y el modo de transporte
+        var tiempoEstimado = calcularTiempoEstimado(clickedDistance, modoTransporte);
+        document.getElementById('infoPanel').innerHTML += "<br>Distancia al lugar seleccionado: " + clickedDistance.toFixed(2) + " km";
+        document.getElementById('infoPanel').innerHTML += "<br>Tiempo transcurrido desde la posición actual: " + " Tiempo transcurrido: " + horas + " horas, " + minutos + " minutos, " + segundos + " segundos";
+        document.getElementById('infoPanel').innerHTML += "<br>Tiempo estimado para llegar (" + modoTransporte + "): " + tiempoEstimado.horas + " horas, " + tiempoEstimado.minutos + " minutos, " + tiempoEstimado.segundos + " segundos";
+
+        // Guardar en localStorage
+        localStorage.setItem('clickedPosition', JSON.stringify({
+          latitude: e.latlng.lat,
+          longitude: e.latlng.lng
+        }));
+        localStorage.setItem('clickedDistance', clickedDistance.toFixed(2));
+        localStorage.setItem('elapsedTime', elapsedTime);
+      });
+    }
+
+    // Función para calcular el tiempo estimado en base a la distancia y el modo de transporte
+    function calcularTiempoEstimado(distancia, modoTransporte) {
+      var velocidadPromedio;
+      if (modoTransporte === 'coche') {
+        velocidadPromedio = 50; // Velocidad promedio en km/h para coche
+      } else if (modoTransporte === 'andando') {
+        velocidadPromedio = 5; // Velocidad promedio en km/h para andar
+      } else {
+        console.error('Modo de transporte no válido');
+        return null;
+      }
+
+      var tiempoEnHoras = distancia / velocidadPromedio;
+      var tiempoEnMinutos = tiempoEnHoras * 60;
+      var horas = Math.floor(tiempoEnHoras);
+      var minutos = Math.floor(tiempoEnMinutos % 60);
+      var segundos = Math.floor(tiempoEnMinutos % 1 * 60);
+      return { horas: horas, minutos: minutos, segundos: segundos };
+    }
+
+    // Función para actualizar el modo de transporte
+    function actualizarModoTransporte() {
+      modoTransporte = document.getElementById('transporte').value;
+    }
+
+    // Función para cargar datos del localStorage al inicio de la aplicación
+    window.onload = function () {
+      if (localStorage.getItem('historicLocations')) {
+        historicLocations = JSON.parse(localStorage.getItem('historicLocations'));
+        mostrarHistorico();
+      }
+
+      if (localStorage.getItem('currentPosition')) {
+        var currentPosition = JSON.parse(localStorage.getItem('currentPosition'));
+        mostrarCurrentPosition(currentPosition.latitude, currentPosition.longitude);
+      }
+
+      if (localStorage.getItem('carPosition')) {
+        var carPosition = JSON.parse(localStorage.getItem('carPosition'));
+        mostrarCarPosition(carPosition.latitude, carPosition.longitude);
+      }
+    };
+
+    // Función para mostrar la posición actual guardada en localStorage
+    function mostrarCurrentPosition(latitude, longitude) {
+      map.setView([latitude, longitude], 16);
+      var marker = L.marker([latitude, longitude]).addTo(map);
+      marker.bindPopup("<b>Hola</b><br>Esta es su posición actual.");
+    }
+
+    // Función para mostrar la posición del coche guardada en localStorage
+    function mostrarCarPosition(latitude, longitude) {
+      map.setView([latitude, longitude], 16);
+      var marker = L.marker([latitude, longitude]).addTo(map);
+      marker.bindPopup("<b>Posición Actual del coche</b><br>Su coche está aquí");
+    }
+
+    map.on('click', onMapClick);
+  </script>
+
+  <!-- Footer -->
+  <footer>
+    <p>® 2024 Francisco Javier Alarcon Jimenez | Todos los derechos reservados |Política de privacidad</p>
+  </footer>
+</body>
+
+</html>
+
